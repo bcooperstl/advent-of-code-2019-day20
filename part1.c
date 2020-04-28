@@ -150,5 +150,8 @@ int main (int argc, char * argv[])
     
     display_map(&u.myMap, WITH_PORTALS);
     
+    assign_portals_to_segments(&u);
+    set_portal_to_portal_distances_in_segments(&u);
+    
     return 0;
 }

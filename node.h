@@ -76,5 +76,8 @@ void display_map(map * m, int show_segments);
 void init_universe(universe * u);
 segment * next_universe_segment(universe * u);
 void segmentize(universe * u);
+void assign_portals_to_segments(universe * u);
+int get_add_portal_number(universe * u, char * portal_name);
+void set_portal_to_portal_distances_in_segments(universe * u);
 
 #endif

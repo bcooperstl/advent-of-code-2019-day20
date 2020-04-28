@@ -202,3 +202,169 @@ void segmentize(universe * u)
     printf("Final segmented map:\n");
     display_map(m, WITH_SEGMENTS);
 }
+
+int get_segment_number(universe * u, char label)
+{
+    for (int i=0; i<u->num_segments; i++)
+    {
+        if (u->segments[i].label==label)
+            return i;
+    }
+    fprintf(stderr, "Segment %c not found. Fix your code.\n", label);
+    exit(-1);
+}
+
+int get_add_portal_number(universe * u, char * portal_name)
+{
+    for (int i=0; i<u->num_portals; i++)
+    {
+        if (strncmp(u->portals[i], portal_name, PORTAL_LENGTH) == 0)
+            return i;
+    }
+    if (u->num_portals==MAX_PORTALS)
+    {
+        fprintf(stderr, "Attempting to exceed the number of portals with portal %s. Increase number and recompile\n", portal_name);
+        exit(1);
+    }
+    printf("Adding portal %s to location %d\n", portal_name, u->num_portals);
+    strncpy(u->portals[u->num_portals], portal_name, PORTAL_LENGTH+1);
+    u->num_portals++;
+    return u->num_portals-1;
+}
+
+int get_segment_portal_number(segment * s, char * portal_name)
+{
+    for (int i=0; i<s->num_portals; i++)
+        if (strncmp(portal_name, s->portals[i], PORTAL_LENGTH)==0)
+            return i;
+    fprintf(stderr, "Portal %s not found in segment %c. Fix your code\n", portal_name, s->label);
+}
+
+void assign_portals_to_segments(universe * u)
+{
+    for (int row=0; row<u->myMap.num_rows; row++)
+    {
+        for (int col=0; col<u->myMap.num_cols; col++)
+        {
+            map_node * n=&u->myMap.layout[row][col];
+            if (n->is_portal==1)
+            {
+                int segment_number=get_segment_number(u, n->segment_label);
+                segment * s=&u->segments[segment_number];
+                int portal_number=get_add_portal_number(u, n->portal);
+                add_portal_to_segment(s, n->portal);
+                if (u->portal_segments[portal_number][0]==NULL)
+                {
+                    printf("Setting first segment for %s to %c\n", n->portal, s->label);
+                    u->portal_segments[portal_number][0]=s;
+                }
+                else
+                {
+                    printf("Setting second segment for %s to %c\n", n->portal, s->label);
+                    u->portal_segments[portal_number][1]=s;
+                }
+                if (strncmp(n->portal, START_PORTAL, PORTAL_LENGTH)==0)
+                {
+                    printf("Setting start segment to segment %c\n", s->label);
+                    u->start_segment=s;
+                }
+                if (strncmp(n->portal, END_PORTAL, PORTAL_LENGTH)==0)
+                {
+                    printf("Setting end segment to segment %c\n", s->label);
+                    u->end_segment=s;
+                }                
+            }
+        }
+    }
+}
+
+void set_portal_to_portal_distances_in_segments(universe * u)
+{
+    map * m=&u->myMap;
+
+    for (int outerRow=0; outerRow<m->num_rows; outerRow++)
+    {
+        for (int outerCol=0; outerCol<m->num_cols; outerCol++)
+        {
+            map_node * n=&u->myMap.layout[outerRow][outerCol];
+            if (n->is_portal==1)
+            {
+                segment * s=&u->segments[get_segment_number(u, n->segment_label)];
+                int sp=get_segment_portal_number(s, n->portal);
+                printf("Working through map to find distances from portal %s (row=%d, col=%d) in segment %c\n", n->portal, outerRow, outerCol, s->label);
+                
+                for (int i=0; i<MAX_MAP_SIZE; i++)
+                {
+                    for (int j=0; j<MAX_MAP_SIZE; j++)
+                    {
+                        m->layout[i][j].tmp_length=UNDEFINED_LENGTH;
+                    }
+                }
+                
+                m->layout[outerRow][outerCol].tmp_length=0;
+                int workToDo = 1;
+                int current_distance = 0;
+                char label=s->label;
+                while(workToDo != 0)
+                {
+                    workToDo=0;
+                    for (int row=0; row<m->num_rows; row++)
+                    {
+                        for (int col=0; col<m->num_cols; col++)
+                        {
+                            map_node * curr = &m->layout[row][col];
+                            if (curr->segment_label==label && curr->tmp_length==current_distance)
+                            {
+                                // check if this one is a portal
+                                if (curr->is_portal==1)
+                                {
+                                    int other_sp=get_segment_portal_number(s, curr->portal);
+                                    printf("Setting distance of %d from %s to %s in segment %c\n", current_distance, n->portal, curr->portal, label);
+                                    s->portal_to_portal_distances[sp][other_sp]=current_distance;
+                                }
+
+                                // up
+                                if (row > 0)
+                                {
+                                    if (isPassage(m->layout[row-1][col].display_ch) && m->layout[row-1][col].tmp_length==UNDEFINED_LENGTH)
+                                    {
+                                        workToDo=1;
+                                        m->layout[row-1][col].tmp_length=current_distance+1;
+                                    }
+                                }
+                                // down
+                                if (row < m->num_rows-1)
+                                {
+                                    if (isPassage(m->layout[row+1][col].display_ch) && m->layout[row+1][col].tmp_length==UNDEFINED_LENGTH)
+                                    {
+                                        workToDo=1;
+                                        m->layout[row+1][col].tmp_length=current_distance+1;
+                                    }
+                                }
+                                // left
+                                if (col > 0)
+                                {
+                                    if (isPassage(m->layout[row][col-1].display_ch) && m->layout[row][col-1].tmp_length==UNDEFINED_LENGTH)
+                                    {
+                                        workToDo=1;
+                                        m->layout[row][col-1].tmp_length=current_distance+1;
+                                    }
+                                }
+                                // right
+                                if (col < m->num_cols-1)
+                                {
+                                    if (isPassage(m->layout[row][col+1].display_ch) && m->layout[row][col+1].tmp_length==UNDEFINED_LENGTH)
+                                    {
+                                        workToDo=1;
+                                        m->layout[row][col+1].tmp_length=current_distance+1;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    current_distance++;
+                }
+            }
+        }
+    }
+}
