@@ -1,7 +1,7 @@
 #ifndef __NODE_H__
 #define __NODE_H__
 
-#define MAX_SEGMENTS 26 // maximum number of segments in the map
+#define MAX_SEGMENTS 36 // maximum number of segments in the map
 #define MAX_PORTALS_PER_SEGMENT 10
 #define PORTAL_LENGTH 2
 #define MAX_MAP_SIZE 256

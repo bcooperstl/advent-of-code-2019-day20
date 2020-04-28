@@ -115,7 +115,7 @@ segment * next_universe_segment(universe * u)
         exit(1);
     }
     segment * next=&u->segments[u->num_segments];
-    char label='a'+u->num_segments;
+    char label=(u->num_segments<26?'a'+u->num_segments:'A'+u->num_segments-26);
     u->num_segments++;
     init_segment(next, label);
     return next;
