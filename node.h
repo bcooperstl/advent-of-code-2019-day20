@@ -6,6 +6,7 @@
 #define PORTAL_LENGTH 2
 #define MAX_MAP_SIZE 256
 #define MAX_PORTALS 32
+#define MAX_STEPS 100
 
 #define START_PORTAL "AA"
 #define END_PORTAL "ZZ"
@@ -65,6 +66,23 @@ struct universe
 
 typedef struct universe universe;
 
+struct step
+{
+    segment * segment;
+    char from_portal[PORTAL_LENGTH+1];
+    char to_portal[PORTAL_LENGTH+1];
+};
+
+typedef struct step step;
+
+struct path
+{
+    int num_steps;
+    step steps[MAX_STEPS];
+};
+
+typedef struct path path;
+
 void init_segment(segment * segment, char label);
 void add_portal_to_segment(segment * segment, char * portal_name);
 void set_portal_to_portal_distance(segment * segment, char * from_portal, char * to_portal, int distance);
@@ -79,5 +97,8 @@ void segmentize(universe * u);
 void assign_portals_to_segments(universe * u);
 int get_add_portal_number(universe * u, char * portal_name);
 void set_portal_to_portal_distances_in_segments(universe * u);
+
+int is_complete_path(path * p);
+int calculate_path_length(path * p);
 
 #endif
