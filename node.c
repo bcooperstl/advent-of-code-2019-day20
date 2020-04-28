@@ -63,6 +63,7 @@ void init_map(map * m, int rows, int cols)
 {
     m->num_rows=rows;
     m->num_cols=cols;
+    printf("initializing a row=%d col=%d map\n", rows, cols);
     for (int row=0; row<rows; row++)
     {
         for (int col=0; col<cols; col++)
@@ -90,4 +91,112 @@ void display_map(map * m, int show_segments)
         }
         printf("\n");
     }
+}
+
+void init_universe(universe * u)
+{
+    u->num_segments=0;
+    u->num_portals=0;
+    u->start_segment=NULL;
+    u->end_segment=NULL;
+    for (int i=0; i<MAX_PORTALS; i++)
+    {
+        u->portals[i][0]='\0';
+        u->portal_segments[i][0]=NULL;
+        u->portal_segments[i][1]=NULL;
+    }
+}
+
+segment * next_universe_segment(universe * u)
+{
+    if (u->num_segments==MAX_SEGMENTS)
+    {
+        fprintf(stderr, "Attempting to exceed the number of segments in the universe. Increase number and recompile\n");
+        exit(1);
+    }
+    segment * next=&u->segments[u->num_segments];
+    char label='a'+u->num_segments;
+    u->num_segments++;
+    init_segment(next, label);
+    return next;
+}
+
+void fill_segment_in_map(map * m, segment * s)
+{
+    int workToDo = 1;
+    char label=s->label;
+    while(workToDo != 0)
+    {
+        workToDo=0;
+        for (int row=0; row<m->num_rows; row++)
+        {
+            for (int col=0; col<m->num_cols; col++)
+            {
+                if (m->layout[row][col].segment_label==label)
+                {
+                    // up
+                    if (row > 0)
+                    {
+                        if (isPassage(m->layout[row-1][col].display_ch) && m->layout[row-1][col].segment_label==SEGMENT_BLANK)
+                        {
+                            workToDo=1;
+                            m->layout[row-1][col].segment_label=label;
+                        }
+                    }
+                    // down
+                    if (row < m->num_rows-1)
+                    {
+                        if (isPassage(m->layout[row+1][col].display_ch) && m->layout[row+1][col].segment_label==SEGMENT_BLANK)
+                        {
+                            workToDo=1;
+                            m->layout[row+1][col].segment_label=label;
+                        }
+                    }
+                    // left
+                    if (col > 0)
+                    {
+                        if (isPassage(m->layout[row][col-1].display_ch) && m->layout[row][col-1].segment_label==SEGMENT_BLANK)
+                        {
+                            workToDo=1;
+                            m->layout[row][col-1].segment_label=label;
+                        }
+                    }
+                    // right
+                    if (col < m->num_cols-1)
+                    {
+                        if (isPassage(m->layout[row][col+1].display_ch) && m->layout[row][col+1].segment_label==SEGMENT_BLANK)
+                        {
+                            workToDo=1;
+                            m->layout[row][col+1].segment_label=label;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}  
+
+void segmentize(universe * u)
+{
+    map * m=&u->myMap;
+    printf("Initial map:\n");
+    display_map(m, NO_SEGMENTS);
+    for (int row=0; row<m->num_rows; row++)
+    {
+        for (int col=0; col<m->num_cols; col++)
+        {
+            map_node * node=&m->layout[row][col];
+            if (isPassage(node->display_ch) && node->segment_label==SEGMENT_BLANK)
+            {
+                // this is a passage that does not have a segment assigned.
+                segment * s = next_universe_segment(u);
+                node->segment_label=s->label;
+                fill_segment_in_map(m, s);
+                printf("After allocating segment %c:\n", s->label);
+                display_map(m, WITH_SEGMENTS);
+            }
+        }
+    }
+    printf("Final segmented map:\n");
+    display_map(m, WITH_SEGMENTS);
 }
