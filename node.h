@@ -19,6 +19,7 @@
 
 #define NO_SEGMENTS 0
 #define WITH_SEGMENTS 1
+#define WITH_PORTALS 2
 
 struct segment
 {

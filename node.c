@@ -78,15 +78,17 @@ int isPassage(char ch)
     return (ch==MAP_PASSAGE?1:0);
 }
 
-void display_map(map * m, int show_segments)
+void display_map(map * m, int print_type)
 {
     for (int row=0; row<m->num_rows; row++)
     {
         for (int col=0; col<m->num_cols; col++)
         {
             char ch=m->layout[row][col].display_ch;
-            if (isPassage(ch) && show_segments==1)
+            if (isPassage(ch) && print_type==WITH_SEGMENTS)
                 ch=m->layout[row][col].segment_label;
+            if (m->layout[row][col].is_portal==1 && print_type==WITH_PORTALS)
+                ch='*';
             printf("%c", ch);
         }
         printf("\n");
