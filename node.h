@@ -100,5 +100,8 @@ void set_portal_to_portal_distances_in_segments(universe * u);
 
 int is_complete_path(path * p);
 int calculate_path_length(path * p);
+void recursive_work_segments(universe * u, path * current_path, path * best_path);
+void find_best_path(universe * u, path * best_path);
+void print_path(path * p);
 
 #endif

@@ -153,5 +153,11 @@ int main (int argc, char * argv[])
     assign_portals_to_segments(&u);
     set_portal_to_portal_distances_in_segments(&u);
     
+    path best_path;
+    find_best_path(&u, &best_path);
+    printf("The best path is: ");
+    print_path(&best_path);
+    printf("The best length is %d\n", calculate_path_length(&best_path));
+    
     return 0;
 }

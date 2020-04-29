@@ -368,3 +368,115 @@ void set_portal_to_portal_distances_in_segments(universe * u)
         }
     }
 }
+
+// this is a complete path if the last step ends at the end portal
+int is_complete_path(path * p)
+{
+    return strncmp(p->steps[p->num_steps-1].to_portal, END_PORTAL, PORTAL_LENGTH)==0 ? 1 : 0;
+}
+
+int calculate_path_length(path * p)
+{
+    int length=0;
+    
+    for (int i=0; i<p->num_steps; i++)
+    {
+        segment * s = p->steps[i].segment;
+        int from_num=get_segment_portal_number(s, p->steps[i].from_portal);
+        int to_num=get_segment_portal_number(s, p->steps[i].to_portal);
+        length+=s->portal_to_portal_distances[from_num][to_num];
+    }
+    
+    // add 1 for all of the portals traversed (num of steps - 1)
+    length+=(p->num_steps-1);
+    return length;
+}
+
+void find_best_path(universe * u, path * best_path)
+{
+    best_path->num_steps=-1;
+    path current_path;
+    current_path.num_steps=0;
+    current_path.steps[0].segment=u->start_segment;
+    strncpy(current_path.steps[0].from_portal, START_PORTAL, PORTAL_LENGTH+1);
+    recursive_work_segments(u, &current_path, best_path);
+}
+
+void print_path(path * p)
+{
+    printf("%d steps ", p->num_steps);
+    for (int i=0; i<p->num_steps; i++)
+    {
+        printf("segment %c from %s to %s ", p->steps[i].segment->label, p->steps[i].from_portal, p->steps[i].to_portal);
+        if (i!=p->num_steps-1)
+            printf("warp to ");
+    }
+    printf("\n");
+}
+
+void recursive_work_segments(universe * u, path * current_path, path * best_path)
+{
+    step * current_step=&current_path->steps[current_path->num_steps];
+    step * next_step=&current_path->steps[current_path->num_steps+1];
+    segment * s=current_step->segment;
+    //printf("working through %d options in %c\n", s->num_portals, s->label);
+    for (int i=0; i<s->num_portals; i++)
+    {
+        //printf("checking portal %s in %c\n", s->portals[i], s->label);
+        if (strncmp(current_step->from_portal, s->portals[i], PORTAL_LENGTH) == 0) // skip the current portal`
+        {
+            printf("skipping current portal %s\n", current_step->from_portal);
+            continue;
+        }
+        int should_use=1;
+        // make sure to not go back through a portal we've been through
+        for (int j=0; j<current_path->num_steps; j++)
+        {
+            if (strncmp(s->portals[i], current_path->steps[j].from_portal, PORTAL_LENGTH) == 0)
+            {
+                should_use=0;
+            }
+        }
+        if (should_use==0)
+        {
+            printf("skipping already used protal %s\n", s->portals[i]);
+            continue;
+        }
+            
+        strncpy(current_step->to_portal, s->portals[i], PORTAL_LENGTH+1);
+        current_path->num_steps++;
+        if (is_complete_path(current_path))
+        {
+            int length=calculate_path_length(current_path);
+            printf("Path: ");
+            print_path(current_path);
+            printf("  has length %d\n", length);
+            if (best_path->num_steps == -1 || length < calculate_path_length(best_path))
+            {
+                printf("This is the new best path\n");
+                best_path->num_steps=current_path->num_steps;
+                for (int j=0; j<current_path->num_steps; j++)
+                {
+                    best_path->steps[j].segment=current_path->steps[j].segment;
+                    strncpy(best_path->steps[j].from_portal, current_path->steps[j].from_portal, PORTAL_LENGTH+1);
+                    strncpy(best_path->steps[j].to_portal, current_path->steps[j].to_portal, PORTAL_LENGTH+1);
+                }
+            }
+        }
+        else
+        {
+            strncpy(next_step->from_portal, s->portals[i], PORTAL_LENGTH+1);
+            int universe_portal_number=get_add_portal_number(u, s->portals[i]);
+            if(current_step->segment==u->portal_segments[universe_portal_number][0])
+                next_step->segment=u->portal_segments[universe_portal_number][1];
+            else
+                next_step->segment=u->portal_segments[universe_portal_number][0];
+            printf("recursively working from path: ");
+            print_path(current_path);
+            recursive_work_segments(u, current_path, best_path);
+        }
+        
+        current_path->num_steps--;
+    }    
+}
+
