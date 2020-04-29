@@ -6,7 +6,7 @@
 #define PORTAL_LENGTH 2
 #define MAX_MAP_SIZE 256
 #define MAX_PORTALS 32
-#define MAX_STEPS 100
+#define MAX_STEPS 1000
 
 #define START_PORTAL "AA"
 #define END_PORTAL "ZZ"
@@ -21,6 +21,10 @@
 #define NO_SEGMENTS 0
 #define WITH_SEGMENTS 1
 #define WITH_PORTALS 2
+#define WITH_PORTAL_DIRECTIONS 3
+
+#define OUTSIDE 10
+#define INSIDE 11
 
 struct segment
 {
@@ -38,6 +42,7 @@ struct map_node
     char segment_label;
     int is_portal; // 0 if not portal, 1 if portal
     char portal[PORTAL_LENGTH+1];
+    int portal_direction;
     int tmp_length; // used in calculating portal-to-portal distances. putting it here so I don't need to declare other structures later.
 };
 
@@ -62,6 +67,7 @@ struct universe
     segment * start_segment;
     segment * end_segment;
     segment * portal_segments[MAX_PORTALS][2]; // for each portal in the list, this will point to the 2 segments that it connects to
+    int portal_directions[MAX_PORTALS][2];
 };
 
 typedef struct universe universe;
@@ -71,6 +77,7 @@ struct step
     segment * segment;
     char from_portal[PORTAL_LENGTH+1];
     char to_portal[PORTAL_LENGTH+1];
+    int depth;
 };
 
 typedef struct step step;
@@ -103,5 +110,8 @@ int calculate_path_length(path * p);
 void recursive_work_segments(universe * u, path * current_path, path * best_path);
 void find_best_path(universe * u, path * best_path);
 void print_path(path * p);
+void depth_recursive_work_segments(universe * u, path * current_path, path * best_path);
+void depth_find_best_path(universe * u, path * best_path);
+void depth_print_path(path * p);
 
 #endif

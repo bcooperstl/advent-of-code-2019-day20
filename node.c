@@ -56,6 +56,7 @@ void init_map_node(map_node * n)
     n->segment_label=SEGMENT_BLANK;
     n->is_portal=0;
     n->portal[0]='\0';
+    n->portal_direction=0;
     n->tmp_length=UNDEFINED_LENGTH;
 }
 
@@ -89,6 +90,15 @@ void display_map(map * m, int print_type)
                 ch=m->layout[row][col].segment_label;
             if (m->layout[row][col].is_portal==1 && print_type==WITH_PORTALS)
                 ch='*';
+            if (m->layout[row][col].is_portal==1 && print_type==WITH_PORTAL_DIRECTIONS)
+            {
+                if (m->layout[row][col].portal_direction==OUTSIDE)
+                    ch='O';
+                else if (m->layout[row][col].portal_direction==INSIDE)
+                    ch='I';
+                else
+                    ch='?';
+            }
             printf("%c", ch);
         }
         printf("\n");
@@ -106,6 +116,8 @@ void init_universe(universe * u)
         u->portals[i][0]='\0';
         u->portal_segments[i][0]=NULL;
         u->portal_segments[i][1]=NULL;
+        u->portal_directions[i][0]=0;
+        u->portal_directions[i][1]=0;        
     }
 }
 
@@ -257,11 +269,13 @@ void assign_portals_to_segments(universe * u)
                 {
                     printf("Setting first segment for %s to %c\n", n->portal, s->label);
                     u->portal_segments[portal_number][0]=s;
+                    u->portal_directions[portal_number][0]=n->portal_direction;
                 }
                 else
                 {
                     printf("Setting second segment for %s to %c\n", n->portal, s->label);
                     u->portal_segments[portal_number][1]=s;
+                    u->portal_directions[portal_number][1]=n->portal_direction;
                 }
                 if (strncmp(n->portal, START_PORTAL, PORTAL_LENGTH)==0)
                 {
@@ -402,12 +416,35 @@ void find_best_path(universe * u, path * best_path)
     recursive_work_segments(u, &current_path, best_path);
 }
 
+void depth_find_best_path(universe * u, path * best_path)
+{
+    best_path->num_steps=-1;
+    path current_path;
+    current_path.num_steps=0;
+    current_path.steps[0].segment=u->start_segment;
+    current_path.steps[0].depth=0;
+    strncpy(current_path.steps[0].from_portal, START_PORTAL, PORTAL_LENGTH+1);
+    depth_recursive_work_segments(u, &current_path, best_path);
+}
+
 void print_path(path * p)
 {
     printf("%d steps ", p->num_steps);
     for (int i=0; i<p->num_steps; i++)
     {
         printf("segment %c from %s to %s ", p->steps[i].segment->label, p->steps[i].from_portal, p->steps[i].to_portal);
+        if (i!=p->num_steps-1)
+            printf("warp to ");
+    }
+    printf("\n");
+}
+
+void depth_print_path(path * p)
+{
+    printf("%d steps ", p->num_steps);
+    for (int i=0; i<p->num_steps; i++)
+    {
+        printf("segment %c at depth %d from %s to %s ", p->steps[i].segment->label, p->steps[i].depth, p->steps[i].from_portal, p->steps[i].to_portal);
         if (i!=p->num_steps-1)
             printf("warp to ");
     }
@@ -474,6 +511,103 @@ void recursive_work_segments(universe * u, path * current_path, path * best_path
             printf("recursively working from path: ");
             print_path(current_path);
             recursive_work_segments(u, current_path, best_path);
+        }
+        
+        current_path->num_steps--;
+    }    
+}
+
+void depth_recursive_work_segments(universe * u, path * current_path, path * best_path)
+{
+    step * current_step=&current_path->steps[current_path->num_steps];
+    step * next_step=&current_path->steps[current_path->num_steps+1];
+    segment * s=current_step->segment;
+    //printf("working through %d options in %c\n", s->num_portals, s->label);
+    for (int i=0; i<s->num_portals; i++)
+    {
+        printf("checking portal %s in %c\n", s->portals[i], s->label);
+        if (strncmp(current_step->from_portal, s->portals[i], PORTAL_LENGTH) == 0) // skip the current portal`
+        {
+            printf("skipping current portal %s\n", current_step->from_portal);
+            continue;
+        }
+        if (current_step->depth !=0 &&
+            (strncmp(s->portals[i], START_PORTAL, PORTAL_LENGTH) == 0 ||
+             strncmp(s->portals[i], END_PORTAL, PORTAL_LENGTH) == 0))
+        {
+            printf("Skipping portal %s at non-zero depth\n", s->portals[i]);
+            continue;
+        }
+            
+        int should_use=1;
+        // make sure to not go back through a portal at the same depth we've been through
+        for (int j=0; j<current_path->num_steps; j++)
+        {
+            if ((strncmp(s->portals[i], current_path->steps[j].from_portal, PORTAL_LENGTH) == 0) && (current_path->steps[j].depth==current_step->depth))
+            {
+                should_use=0;
+            }
+            // make sure not to do the same step twice
+            if ((strncmp(current_path->steps[j].from_portal, current_step->from_portal, PORTAL_LENGTH) == 0) &&
+                (strncmp(current_path->steps[j].to_portal, s->portals[i], PORTAL_LENGTH) == 0))
+            {
+                printf("skipping duplicate step from %s to %s\n", current_step->from_portal, current_step->to_portal);
+                should_use=0;
+            }
+        }
+        if (should_use==0)
+        {
+            printf("skipping already used portal %s at depth %d\n", s->portals[i], current_step->depth);
+            continue;
+        }
+            
+        strncpy(current_step->to_portal, s->portals[i], PORTAL_LENGTH+1);
+        current_path->num_steps++;
+        if (is_complete_path(current_path))
+        {
+            int length=calculate_path_length(current_path);
+            printf("Path: ");
+            depth_print_path(current_path);
+            printf("  has length %d\n", length);
+            if (best_path->num_steps == -1 || length < calculate_path_length(best_path))
+            {
+                printf("This is the new best path\n");
+                best_path->num_steps=current_path->num_steps;
+                for (int j=0; j<current_path->num_steps; j++)
+                {
+                    best_path->steps[j].segment=current_path->steps[j].segment;
+                    strncpy(best_path->steps[j].from_portal, current_path->steps[j].from_portal, PORTAL_LENGTH+1);
+                    strncpy(best_path->steps[j].to_portal, current_path->steps[j].to_portal, PORTAL_LENGTH+1);
+                    best_path->steps[j].depth=current_path->steps[j].depth;
+                }
+            }
+        }
+        else
+        {
+            strncpy(next_step->from_portal, s->portals[i], PORTAL_LENGTH+1);
+            int universe_portal_number=get_add_portal_number(u, s->portals[i]);
+            if(current_step->segment==u->portal_segments[universe_portal_number][0])
+            {
+                next_step->segment=u->portal_segments[universe_portal_number][1];
+                if (u->portal_directions[universe_portal_number][1]==OUTSIDE)
+                    next_step->depth=current_step->depth-1;
+                else
+                    next_step->depth=current_step->depth+1;
+            }
+            else
+            {
+                next_step->segment=u->portal_segments[universe_portal_number][0];
+                if (u->portal_directions[universe_portal_number][0]==OUTSIDE)
+                    next_step->depth=current_step->depth-1;
+                else
+                    next_step->depth=current_step->depth+1;
+            }
+            if (next_step->depth!=-1)
+            {
+                printf("recursively working from path: ");
+                depth_print_path(current_path);
+                depth_recursive_work_segments(u, current_path, best_path);
+            }
         }
         
         current_path->num_steps--;
