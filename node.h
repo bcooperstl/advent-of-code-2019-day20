@@ -113,5 +113,6 @@ void print_path(path * p);
 void depth_recursive_work_segments(universe * u, path * current_path, path * best_path);
 void depth_find_best_path(universe * u, path * best_path);
 void depth_print_path(path * p);
+int is_in_worse_loop(path * p);
 
 #endif

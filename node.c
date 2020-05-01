@@ -517,6 +517,84 @@ void recursive_work_segments(universe * u, path * current_path, path * best_path
     }    
 }
 
+int is_in_worse_loop(path * p)
+{
+    step * current_step=&p->steps[p->num_steps-1];
+    step * prior_match=NULL;
+    int prior_step_number=0;
+    step * prior_prior_match=NULL;
+    int prior_prior_step_number=0;
+    for (int i=p->num_steps-2; i>=0; i--)
+    {
+        if ((strncmp(current_step->from_portal, p->steps[i].from_portal, PORTAL_LENGTH) == 0) &&
+            (strncmp(current_step->to_portal, p->steps[i].to_portal, PORTAL_LENGTH) == 0))
+        {
+            if (prior_match==NULL)
+            {
+                prior_match=&p->steps[i];
+                prior_step_number=i;
+            }
+            else if (prior_prior_match==NULL)
+            {
+                prior_prior_match=&p->steps[i];
+                prior_prior_step_number=i;
+                break; // done with our loop when both have been set
+            }
+        }
+    }
+    if (prior_prior_match==NULL)
+        return 0;
+    printf("checking for loop - step %d goes from %s to %s at depth %d; step %d goes from %s to %s at depth %d; current step %d goes from %s to %s at depth %d\n",
+            prior_prior_step_number, prior_prior_match->from_portal, prior_prior_match->to_portal, prior_prior_match->depth,
+            prior_step_number, prior_match->from_portal, prior_match->to_portal, prior_match->depth,
+            p->num_steps-1, current_step->from_portal, current_step->to_portal, current_step->depth);
+    
+    // short circuit this
+    
+    if (prior_prior_match->depth <= prior_match->depth && prior_match->depth <= current_step->depth)
+    {
+        printf("This keeps getting deeper. Return that it is a loop.\n");
+        return 1;
+    }
+    return 0;
+    
+    
+    int is_worse_loop=1;
+    int step_offset=prior_step_number-(p->num_steps-1); // should be negative
+    
+    for (int i=p->num_steps-1; i>=prior_step_number; i--)
+    {
+        int prior_idx=i;
+        int prior_prior_idx=prior_idx+step_offset;
+        if ((strncmp(p->steps[prior_idx].from_portal, p->steps[prior_prior_idx].from_portal, PORTAL_LENGTH) == 0) &&
+            (strncmp(p->steps[prior_idx].to_portal, p->steps[prior_prior_idx].to_portal, PORTAL_LENGTH) == 0))
+        {
+            if (p->steps[prior_idx].depth<=p->steps[prior_prior_idx].depth)
+            {
+                printf("not a loop - getting closer to surface. step %d goes from %s to %s at depth %d. step %d goes from %s to %s at depth %d\n",
+                       prior_prior_idx, p->steps[prior_prior_idx].from_portal, p->steps[prior_prior_idx].to_portal, p->steps[prior_prior_idx].depth,
+                       prior_idx, p->steps[prior_idx].from_portal, p->steps[prior_idx].to_portal, p->steps[prior_idx].depth);
+                is_worse_loop=0;
+                break;
+            }
+                
+        }
+        else
+        {
+            printf("not a loop - portal mismatch. step %d goes from %s to %s. step %d goes from %s to %s\n",
+                   prior_prior_idx, p->steps[prior_prior_idx].from_portal, p->steps[prior_prior_idx].to_portal,
+                   prior_idx, p->steps[prior_idx].from_portal, p->steps[prior_idx].to_portal);
+            is_worse_loop=0;
+            break;
+        }
+    }
+    if (is_worse_loop==1)
+    {
+        printf("After checking, worse loop is found\n");
+    }
+    return is_worse_loop;
+}
+
 void depth_recursive_work_segments(universe * u, path * current_path, path * best_path)
 {
     step * current_step=&current_path->steps[current_path->num_steps];
@@ -569,29 +647,29 @@ void depth_recursive_work_segments(universe * u, path * current_path, path * bes
             printf("skipping current portal %s\n", current_step->from_portal);
             continue;
         }
-        int should_use=1;
-        // make sure to not go back through a portal at the same depth we've been through
-        for (int j=0; j<current_path->num_steps; j++)
-        {
-            if ((strncmp(s->portals[i], current_path->steps[j].from_portal, PORTAL_LENGTH) == 0) && (current_path->steps[j].depth==current_step->depth))
-            {
-                printf("skipping duplicate step for portal %s at depth %d\n", s->portals[i], current_step->depth);
-                should_use=0;
-            }
-            // make sure not to do the same step twice at the same depth
-            if (((strncmp(current_path->steps[j].from_portal, current_step->from_portal, PORTAL_LENGTH) == 0) &&
-                (strncmp(current_path->steps[j].to_portal, s->portals[i], PORTAL_LENGTH) == 0)) &&
-                current_path->steps[j].depth<=next_depth)
-            {
-                printf("skipping duplicate step from %s to %s\n", current_step->from_portal, current_step->to_portal);
-                should_use=0;
-            }
-        }
-        if (should_use==0)
-        {
-            printf("skipping already used portal %s at depth %d\n", s->portals[i], current_step->depth);
-            continue;
-        }
+        //int should_use=1;
+        //// make sure to not go back through a portal at the same depth we've been through
+        //for (int j=0; j<current_path->num_steps; j++)
+        //{
+        //    if ((strncmp(s->portals[i], current_path->steps[j].from_portal, PORTAL_LENGTH) == 0) && (current_path->steps[j].depth==current_step->depth))
+        //    {
+        //        printf("skipping duplicate step for portal %s at depth %d\n", s->portals[i], current_step->depth);
+        //        should_use=0;
+        //    }
+        //    // make sure not to do the same step twice at the same depth
+        //    if (((strncmp(current_path->steps[j].from_portal, current_step->from_portal, PORTAL_LENGTH) == 0) &&
+        //        (strncmp(current_path->steps[j].to_portal, s->portals[i], PORTAL_LENGTH) == 0)) &&
+        //        current_path->steps[j].depth<=next_depth)
+        //    {
+        //        printf("skipping duplicate step from %s to %s\n", current_step->from_portal, current_step->to_portal);
+        //        should_use=0;
+        //    }
+        //}
+        //if (should_use==0)
+        //{
+        //    printf("skipping already used portal %s at depth %d\n", s->portals[i], current_step->depth);
+        //    continue;
+        //}
             
         strncpy(current_step->to_portal, s->portals[i], PORTAL_LENGTH+1);
         current_path->num_steps++;
@@ -613,6 +691,12 @@ void depth_recursive_work_segments(universe * u, path * current_path, path * bes
                     best_path->steps[j].depth=current_path->steps[j].depth;
                 }
             }
+        }
+        else if (is_in_worse_loop(current_path))
+        {
+            printf("Path: ");
+            depth_print_path(current_path);
+            printf("  has a loop that is getting worse. Breaking out of this path\n");
         }
         else
         {
