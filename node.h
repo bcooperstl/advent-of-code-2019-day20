@@ -6,7 +6,7 @@
 #define PORTAL_LENGTH 2
 #define MAX_MAP_SIZE 256
 #define MAX_PORTALS 32
-#define MAX_STEPS 1000
+#define MAX_STEPS 100
 
 #define START_PORTAL "AA"
 #define END_PORTAL "ZZ"
@@ -86,6 +86,10 @@ struct path
 {
     int num_steps;
     step steps[MAX_STEPS];
+    int is_complete;
+    int is_terminated;
+    int length;
+    struct path * next;
 };
 
 typedef struct path path;
@@ -114,5 +118,7 @@ void depth_recursive_work_segments(universe * u, path * current_path, path * bes
 void depth_find_best_path(universe * u, path * best_path);
 void depth_print_path(path * p);
 int is_in_worse_loop(path * p);
+int breadth_work_path_list(universe * u, path * head, path * best_path);
+
 
 #endif
