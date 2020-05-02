@@ -425,10 +425,19 @@ void depth_find_best_path(universe * u, path * best_path)
     current_path->steps[0].depth=0;
     current_path->is_complete=0;
     current_path->is_terminated=0;
+    current_path->next=NULL;
     strncpy(current_path->steps[0].from_portal, START_PORTAL, PORTAL_LENGTH+1);
     int num_to_eval;
+    int num_steps=0;
     do
     {
+        if (num_steps > MAX_STEPS)
+        {
+            fprintf(stderr, "Still processing after %d steps, which is over max. Recompile\n", num_steps);
+            exit(1);
+        }
+        printf("Calling breadth_work_path_list with %d steps\n", num_steps);
+        num_steps++;
         num_to_eval=breadth_work_path_list(u, current_path, best_path);
     }
     while (num_to_eval > 0);
@@ -780,13 +789,13 @@ int breadth_work_path_list(universe * u, path * head, path * best_path)
         }
         else if (current_path->is_terminated==1)
         {
-            printf("Skipping already terminated path %08X\n", current_path);
+            //printf("Skipping already terminated path %08X\n", current_path);
             current_path=current_path->next;
             continue;
         }
         
         printf("Evaluating path %08X: ", current_path);
-        depth_print_path(current_path);
+        //depth_print_path(current_path);
         current_path->length=calculate_path_length(current_path);
         if (best_path->num_steps > -1 && best_path->length<current_path->length) // already have a best path with a shorter length. done with this one
         {
@@ -798,6 +807,7 @@ int breadth_work_path_list(universe * u, path * head, path * best_path)
         if (is_complete_path(current_path))
         {
             printf("  COMPLETE path detected. Has length %d\n", current_path->length);
+            depth_print_path(current_path);
             current_path->is_complete=1;
             if (best_path->num_steps == -1)
             {
@@ -835,13 +845,21 @@ int breadth_work_path_list(universe * u, path * head, path * best_path)
                 direction=u->portal_directions[universe_portal_number][1];
             }
 
-            if (current_step->depth !=0 &&
-                (strncmp(s->portals[i], START_PORTAL, PORTAL_LENGTH) == 0 ||
-                strncmp(s->portals[i], END_PORTAL, PORTAL_LENGTH) == 0))
+            // always skip the start portal.
+            if (strncmp(s->portals[i], START_PORTAL, PORTAL_LENGTH) == 0)
             {
-                printf("    Skipping possible next portal %s at non-zero depth\n", s->portals[i]);
+                printf("Skipping start portal %s\n", s->portals[i]);
                 continue;
             }
+        
+            // depth non-zero - skip the end portal
+            if (current_step->depth !=0 &&
+                strncmp(s->portals[i], END_PORTAL, PORTAL_LENGTH) == 0)
+            {
+                printf("Skipping end portal %s at non-zero depth\n", s->portals[i]);
+                continue;
+            }
+
             if (current_step->depth == 0)
             {
                 if ((strncmp(s->portals[i], START_PORTAL, PORTAL_LENGTH) != 0 &&

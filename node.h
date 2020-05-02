@@ -6,7 +6,7 @@
 #define PORTAL_LENGTH 2
 #define MAX_MAP_SIZE 256
 #define MAX_PORTALS 32
-#define MAX_STEPS 100
+#define MAX_STEPS 256
 
 #define START_PORTAL "AA"
 #define END_PORTAL "ZZ"
