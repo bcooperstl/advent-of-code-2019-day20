@@ -454,6 +454,7 @@ void dupe_path(path * to, path * from)
     }
     to->is_complete=from->is_complete;
     to->is_terminated=from->is_terminated;
+    to->length=from->length;
     to->next=NULL;
 }
 
@@ -808,6 +809,8 @@ int breadth_work_path_list(universe * u, path * head, path * best_path)
                 printf("    This path has length %d which is better than the best path length %d. Replacing best path with this one.\n", current_path->length, best_path->length);
                 dupe_path(best_path, current_path);
             }
+            current_path=current_path->next;
+            continue;
         }
         
         // at this point, we have a non-complete path. Need to make all of the next paths.
@@ -819,11 +822,18 @@ int breadth_work_path_list(universe * u, path * head, path * best_path)
         for (int i=0; i<s->num_portals; i++)
         {
             int direction=0;
+            segment * os=NULL;
             int universe_portal_number=get_add_portal_number(u, s->portals[i]);
             if(current_step->segment==u->portal_segments[universe_portal_number][0])
+            {
                 direction=u->portal_directions[universe_portal_number][0];
+                os=u->portal_segments[universe_portal_number][1];
+            }
             else
+            {
+                os=u->portal_segments[universe_portal_number][0];
                 direction=u->portal_directions[universe_portal_number][1];
+            }
 
             if (current_step->depth !=0 &&
                 (strncmp(s->portals[i], START_PORTAL, PORTAL_LENGTH) == 0 ||
@@ -847,38 +857,34 @@ int breadth_work_path_list(universe * u, path * head, path * best_path)
                 printf("    Skipping current portal %s\n", s->portals[i]);
                 continue;
             }
+            
             strncpy(next_steps[num_next_steps], s->portals[i], PORTAL_LENGTH+1);
-            if (num_next_steps==0)
-                next_paths[0]=current_path;
-            else
+            next_paths[num_next_steps]=(path *)malloc(sizeof(path));
+            printf("Set next_paths[%d] to new path %08X\n", num_next_steps, next_paths[num_next_steps]);
+            dupe_path(next_paths[num_next_steps], current_path);
+            if (paths_to_append==NULL)
             {
-                next_paths[num_next_steps]=(path *)malloc(sizeof(path));
-                printf("Set next_paths[%d] to new path %08X\n", num_next_steps, next_paths[num_next_steps]);
-                dupe_path(next_paths[num_next_steps], next_paths[0]);
-                if (paths_to_append==NULL)
-                {
-                    printf("setting paths_to_append to %08X\n", next_paths[num_next_steps]);
-                    paths_to_append=next_paths[num_next_steps];
-                }
-                if (last_to_append!=NULL)
-                {
-                    printf("setting last_to_append->next to %08X\n", next_paths[num_next_steps]);
-                    last_to_append->next=next_paths[num_next_steps];
-                }
-                printf("setting last_to_append to %08X\n", next_paths[num_next_steps]);
-                last_to_append=next_paths[num_next_steps];
+                printf("setting paths_to_append to %08X\n", next_paths[num_next_steps]);
+                paths_to_append=next_paths[num_next_steps];
             }
+            if (last_to_append!=NULL)
+            {
+                printf("setting last_to_append->next to %08X\n", next_paths[num_next_steps]);
+                last_to_append->next=next_paths[num_next_steps];
+            }
+            printf("setting last_to_append to %08X\n", next_paths[num_next_steps]);
+            last_to_append=next_paths[num_next_steps];
             
             int next_depth=current_step->depth;
             if (direction==OUTSIDE)
             {
                 next_depth-=1;
-                printf("    setting path %08X with outside portal %s in %c at depth %d.\n", next_paths[num_next_steps], next_steps[num_next_steps], s->label, next_depth);
+                printf("      setting path %08X with outside portal %s in %c at depth %d.\n", next_paths[num_next_steps], next_steps[num_next_steps], s->label, next_depth);
             }
             else
             {
                 next_depth+=1;
-                printf("    setting path %08X with inside portal %s in %c at depth %d.\n", next_paths[num_next_steps], next_steps[num_next_steps], s->label, next_depth);
+                printf("      setting path %08X with inside portal %s in %c at depth %d.\n", next_paths[num_next_steps], next_steps[num_next_steps], s->label, next_depth);
             }
             
             strncpy(next_paths[num_next_steps]->steps[next_paths[num_next_steps]->num_steps].to_portal, next_steps[num_next_steps], PORTAL_LENGTH+1);
@@ -886,23 +892,16 @@ int breadth_work_path_list(universe * u, path * head, path * best_path)
             next_paths[num_next_steps]->num_steps++;
             strncpy(next_paths[num_next_steps]->steps[next_paths[num_next_steps]->num_steps].from_portal, next_steps[num_next_steps], PORTAL_LENGTH+1);
             next_paths[num_next_steps]->steps[next_paths[num_next_steps]->num_steps].depth=next_depth;
-
-            if(current_step->segment==u->portal_segments[universe_portal_number][0])
-                next_paths[num_next_steps]->steps[next_paths[num_next_steps]->num_steps].segment=u->portal_segments[universe_portal_number][1];
-            else
-                next_paths[num_next_steps]->steps[next_paths[num_next_steps]->num_steps].segment=u->portal_segments[universe_portal_number][0];
+            next_paths[num_next_steps]->steps[next_paths[num_next_steps]->num_steps].segment=os;
 
             num_next_steps++;
             paths_to_eval++;
         }
+
         printf("    There are %d possible next steps in %c\n", num_next_steps, s->label);
-        if (num_next_steps==0)
-        {
-            printf("    Setting as terminated since we cannot do anything\n");
-            current_path->is_terminated=1;
-            current_path=current_path->next;
-            continue;
-        }
+        printf("    Setting as terminated and will evaluate the children paths\n");
+
+        current_path->is_terminated=1;
         current_path=current_path->next;
     }
     last_path->next=paths_to_append;
